@@ -8,57 +8,51 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid food description" });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.API_NINJAS_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: `Estimate the nutritional values for this food: "${food}"
-
-Assume a typical single serving. Respond with ONLY a JSON object, no other text, no markdown backticks:
-{"name":"<clean food name>","grams":<serving weight in grams>,"calories":<kcal>,"protein":<grams>,"carbs":<grams>,"fat":<grams>}
-
-Be realistic and accurate. Use common nutritional databases as reference. Round to 1 decimal place for macros, whole numbers for calories and grams.`,
-          },
-        ],
-      }),
-    });
+    const response = await fetch(
+      `https://api.api-ninjas.com/v1/nutrition?query=${encodeURIComponent(food)}`,
+      {
+        headers: { "X-Api-Key": apiKey },
+      }
+    );
 
     if (!response.ok) {
-      const err = await response.text();
-      console.error("Anthropic API error:", err);
-      return res.status(502).json({ error: "AI service error" });
+      console.error("API Ninjas error:", response.status);
+      return res.status(502).json({ error: "Nutrition API error" });
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "";
 
-    // Parse JSON from response
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: "Food not found" });
+    }
 
-    // Validate the response has required fields
+    // Sum up all items (API may return multiple components)
+    // e.g. "pepperoni calzone" might return separate items
+    const totals = data.reduce(
+      (acc, item) => ({
+        calories: acc.calories + (item.calories || 0),
+        protein: acc.protein + (item.protein_g || 0),
+        carbs: acc.carbs + (item.carbohydrates_total_g || 0),
+        fat: acc.fat + (item.fat_total_g || 0),
+        grams: acc.grams + (item.serving_size_g || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0, grams: 0 }
+    );
+
     const result = {
-      name: String(parsed.name || food),
-      grams: Math.round(Number(parsed.grams) || 100),
-      calories: Math.round(Number(parsed.calories) || 0),
-      protein: Math.round((Number(parsed.protein) || 0) * 10) / 10,
-      carbs: Math.round((Number(parsed.carbs) || 0) * 10) / 10,
-      fat: Math.round((Number(parsed.fat) || 0) * 10) / 10,
+      name: data.map((d) => d.name).join(" + "),
+      grams: Math.round(totals.grams),
+      calories: Math.round(totals.calories),
+      protein: Math.round(totals.protein * 10) / 10,
+      carbs: Math.round(totals.carbs * 10) / 10,
+      fat: Math.round(totals.fat * 10) / 10,
+      items: data.map((d) => d.name),
     };
 
     return res.status(200).json(result);
