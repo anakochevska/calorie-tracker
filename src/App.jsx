@@ -17,14 +17,14 @@ function loadSettings() {
   } catch { return null; }
 }
 
-// --- AI estimation via Vercel serverless function ---
-async function estimateWithAI(foodDescription) {
+// --- Nutrition lookup via API Ninjas ---
+async function lookupNutrition(foodDescription) {
   const res = await fetch("/api/estimate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ food: foodDescription }),
   });
-  if (!res.ok) throw new Error("AI estimation failed");
+  if (!res.ok) throw new Error("Nutrition lookup failed");
   return res.json();
 }
 
@@ -91,7 +91,7 @@ const MacroBar = ({ label, value, max, color, unit = "g" }) => {
   );
 };
 
-const AiLoader = () => (
+const SearchLoader = () => (
   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0", marginBottom: 8 }}>
     <div style={{ display: "flex", gap: 3 }}>
       {[0, 1, 2].map(i => (
@@ -102,7 +102,7 @@ const AiLoader = () => (
       ))}
     </div>
     <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>
-      Estimating with AI...
+      Looking up nutrition data...
     </span>
   </div>
 );
@@ -175,13 +175,13 @@ export default function CalorieTracker() {
     }
   }, [grams, selectedFood]);
 
-  const askAI = async () => {
+  const lookupFood = async () => {
     if (!foodName.trim()) return;
     setAiLoading(true);
     setAiError("");
     setAiEstimated(false);
     try {
-      const result = await estimateWithAI(foodName.trim());
+      const result = await lookupNutrition(foodName.trim());
       setGrams(String(result.grams));
       setCal(String(result.calories));
       setProtein(String(result.protein));
@@ -191,7 +191,7 @@ export default function CalorieTracker() {
       setSelectedFood(null);
       setManualMode(false);
     } catch (err) {
-      setAiError("Couldn't estimate — try being more specific or enter manually");
+      setAiError("Food not found — try a different name or enter manually");
     } finally {
       setAiLoading(false);
     }
@@ -327,7 +327,7 @@ export default function CalorieTracker() {
             onKeyDown={e => {
               if (e.key === "Enter") {
                 if (cal) addEntry();
-                else if (showAiButton) askAI();
+                else if (showAiButton) lookupFood();
               }
             }}
             style={{
@@ -365,25 +365,25 @@ export default function CalorieTracker() {
           )}
         </div>
 
-        {/* AI Estimate Button */}
+        {/* Nutrition Lookup Button */}
         {showAiButton && !aiLoading && (
-          <button onClick={askAI} style={{
+          <button onClick={lookupFood} style={{
             width: "100%", padding: "10px", marginBottom: 12,
-            background: "linear-gradient(135deg, #E8572A22, #A855F722)",
+            background: "linear-gradient(135deg, #E8572A22, #3B82F622)",
             border: "1px solid #E8572A44", borderRadius: 10,
             color: "var(--accent)", fontSize: 12, fontFamily: "var(--font-mono)",
             fontWeight: 500, cursor: "pointer", letterSpacing: "0.05em",
             transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "linear-gradient(135deg, #E8572A33, #A855F733)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "#E8572A44"; e.currentTarget.style.background = "linear-gradient(135deg, #E8572A22, #A855F722)"; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "linear-gradient(135deg, #E8572A33, #3B82F633)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "#E8572A44"; e.currentTarget.style.background = "linear-gradient(135deg, #E8572A22, #3B82F622)"; }}
           >
-            <span style={{ fontSize: 14 }}>✨</span>
-            Ask AI to estimate "{foodName.trim()}"
+            <span style={{ fontSize: 14 }}>🔍</span>
+            Look up "{foodName.trim()}"
           </button>
         )}
 
-        {aiLoading && <AiLoader />}
+        {aiLoading && <SearchLoader />}
 
         {aiError && (
           <p style={{ fontSize: 11, color: "#EF4444", fontFamily: "var(--font-mono)", margin: "0 0 10px", padding: "6px 10px", background: "#EF444412", borderRadius: 8 }}>{aiError}</p>
@@ -395,7 +395,7 @@ export default function CalorieTracker() {
             margin: "0 0 10px", padding: "6px 10px", background: "#4ADE8012",
             borderRadius: 8, display: "flex", alignItems: "center", gap: 6,
           }}>
-            <span>✨</span> AI estimate — you can adjust the values below
+            <span>✓</span> Nutrition data found — you can adjust the values below
           </div>
         )}
 
@@ -459,9 +459,9 @@ export default function CalorieTracker() {
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
-                  background: e.ai ? "#A855F718" : `${MACRO_COLORS.calories}18`,
+                  background: e.ai ? "#3B82F618" : `${MACRO_COLORS.calories}18`,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0,
-                }}>{e.ai ? "✨" : "🍽"}</div>
+                }}>{e.ai ? "🔍" : "🍽"}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <span style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.name}</span>
